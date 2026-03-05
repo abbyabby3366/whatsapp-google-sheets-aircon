@@ -24,6 +24,7 @@ import fs from "fs";
 import qrcodeTerminal from "qrcode-terminal";
 import multer from "multer";
 import { jomrewards_api_send_message } from "./jomrewards_api_send_message.js";
+import { trackMessage } from "./message_tracker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,6 +93,7 @@ async function connectToWhatsApp() {
 
   sock.ev.on("messages.upsert", async (m) => {
     await jomrewards_api_send_message(sock, m);
+    await trackMessage(sock, m);
   });
 
   sock.ev.on("connection.update", async (update) => {
