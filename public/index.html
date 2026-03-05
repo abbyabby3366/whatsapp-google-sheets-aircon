@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Web.js Bot</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .header {
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      color: #25D366;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 1.1rem;
+    }
+
+    .status-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border-radius: 15px;
+      background: #f8f9fa;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+
+    .status-disconnected {
+      background: #dc3545;
+    }
+
+    .status-qr_ready {
+      background: #ffc107;
+    }
+
+    .status-authenticated {
+      background: #17a2b8;
+    }
+
+    .status-ready {
+      background: #28a745;
+    }
+
+    .status-auth_failed {
+      background: #dc3545;
+    }
+
+    .qr-container {
+      margin: 20px 0;
+      padding: 20px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .qr-code {
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    .message-form {
+      background: #f8f9fa;
+      padding: 30px;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #25D366;
+    }
+
+    .btn {
+      background: #25D366;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+
+    .btn:hover {
+      background: #128C7E;
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .contacts-section {
+      margin-top: 30px;
+      text-align: left;
+    }
+
+    .contacts-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .contact-item {
+      padding: 10px;
+      border-bottom: 1px solid #e9ecef;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .contact-item:hover {
+      background: #f8f9fa;
+    }
+
+    .contact-item:last-child {
+      border-bottom: none;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #25D366;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .alert {
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+
+    .alert-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+        margin: 10px;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📱 WhatsApp Bot v1.2</h1>
+      <p>Connect and send messages via WhatsApp Web.js</p>
+      <div id="apiEndpoint" style="background: rgba(37, 211, 102, 0.1); border: 1px solid #25D366; border-radius: 8px; padding: 10px; margin-top: 10px; font-size: 0.9rem; color: #25D366;">
+        <strong>External API Endpoint:</strong> <code id="endpointUrl" style="background: rgba(37, 211, 102, 0.2); padding: 2px 4px; border-radius: 4px;">Loading...</code>
+        <br><small>Use this endpoint to send messages programmatically</small>
+      </div>
+    </div>
+
+    <div class="status-section">
+      <h3>
+        <span class="status-indicator" id="statusIndicator"></span>
+        Status: <span id="statusText">Connecting...</span>
+      </h3>
+      <div id="statusDetails"></div>
+    </div>
+
+    <div id="qrContainer" class="qr-container hidden">
+      <h3>Scan QR Code</h3>
+      <p>Open WhatsApp on your phone and scan this QR code to connect</p>
+      <img id="qrCode" class="qr-code" alt="QR Code">
+    </div>
+
+    <div id="messageForm" class="message-form hidden">
+      <h3>Send Message</h3>
+      <form id="sendMessageForm">
+        <div class="form-group">
+          <label for="phoneNumber">Phone Number (with country code):</label>
+          <input type="text" id="phoneNumber" placeholder="60122273341" required>
+        </div>
+        <div class="form-group">
+          <label for="messageText">Message:</label>
+          <textarea id="messageText" rows="4" placeholder="Type your message here..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="imageInput">Attach Images:</label>
+          <input type="file" id="imageInput" multiple accept="image/*">
+          <div id="imagePreview" class="image-preview" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
+        </div>
+        <button type="submit" class="btn" id="sendButton">
+          <span id="sendButtonText">Send Message</span>
+        </button>
+      </form>
+    </div>
+
+    <div id="contactsSection" class="contacts-section hidden">
+      <h3>Your Contacts</h3>
+      <button class="btn" id="loadContactsBtn" style="margin-bottom: 15px;">Load Contacts</button>
+      <div id="contactsList" class="contacts-list"></div>
+    </div>
+
+    <div id="groupsSection" class="contacts-section hidden">
+      <h3>Communities & Groups</h3>
+      <button class="btn" id="loadGroupsBtn" style="margin-bottom: 15px;">Load Communities</button>
+      <div id="groupsList" class="contacts-list"></div>
+    </div>
+
+    <div id="alertContainer"></div>
+
+    <!-- API Documentation Section -->
+    <div id="apiDocs" class="api-docs" style="margin-top: 40px; text-align: left; background: #f8f9fa; padding: 30px; border-radius: 15px;">
+      <h3 style="color: #25D366; margin-bottom: 20px;">📖 External API Documentation</h3>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Endpoint Information</h4>
+        <div style="background: #fff; padding: 15px; border-radius: 8px; border-left: 4px solid #25D366; margin-bottom: 15px;">
+          <strong>URL:</strong> <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-family: monospace;">https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message</code><br>
+          <strong>Method:</strong> <code style="background: #e3f2fd; color: #1565c0; padding: 2px 6px; border-radius: 4px;">POST</code><br>
+          <strong>Content-Type:</strong> <code style="background: #f3e5f5; color: #6a1b9a; padding: 2px 6px; border-radius: 4px;">application/json</code>
+        </div>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Request Parameters</h4>
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <thead style="background: #25D366; color: white;">
+            <tr>
+              <th style="padding: 12px; text-align: left;">Parameter</th>
+              <th style="padding: 12px; text-align: left;">Type</th>
+              <th style="padding: 12px; text-align: left;">Required</th>
+              <th style="padding: 12px; text-align: left;">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 12px; font-weight: bold;">number</td>
+              <td style="padding: 12px;"><code>string</code></td>
+              <td style="padding: 12px; color: #dc3545;">Yes</code></td>
+              <td style="padding: 12px;">Phone number with country code (e.g., "60122273341" or "+60122273341")</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; font-weight: bold;">message</td>
+              <td style="padding: 12px;"><code>string</code></td>
+              <td style="padding: 12px; color: #dc3545;">Yes</code></td>
+              <td style="padding: 12px;">The message text to send</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Phone Number & Group JID Formatting</h4>
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+          <ul style="margin: 0; padding-left: 20px;">
+            <li><strong>Phone Numbers:</strong> <code>60122273341</code> or <code>+60122273341</code>. The API automatically adds the <code>@s.whatsapp.net</code> suffix.</li>
+            <li><strong>Groups & Communities:</strong> Use the Group JID directly (e.g., <code>120363424584075789@g.us</code>).</li>
+            <li><strong>Newsletters/Channels:</strong> Use the Newsletter ID (e.g., <code>1234567890@newsletter</code>).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Response Formats</h4>
+
+        <h5 style="color: #28a745; margin-top: 20px;">Success Response (200)</h5>
+        <pre style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; overflow-x: auto; color: #155724;"><code>{
+  "success": true,
+  "message": "Message sent successfully",
+  "messageId": "BAE1234567890ABCDEF",
+  "recipient": "60122273341",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}</code></pre>
+
+        <h5 style="color: #dc3545; margin-top: 20px;">Error Response (400/500)</h5>
+        <pre style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; overflow-x: auto; color: #721c24;"><code>{
+  "error": "WhatsApp client is not ready",
+  "details": "Connection not established"
+}</code></pre>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Code Examples</h4>
+
+        <h5 style="margin-top: 20px;">cURL</h5>
+        <pre style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; overflow-x: auto;"><code>curl -X POST "https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "60122273341",
+    "message": "Hello from API!"
+  }'</code></pre>
+
+        <h5 style="margin-top: 20px;">JavaScript (Node.js)</h5>
+        <pre style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; overflow-x: auto;"><code>const response = await fetch('https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    number: '60122273341',
+    message: 'Hello from Node.js!'
+  })
+});
+
+const result = await response.json();
+console.log(result);</code></pre>
+
+        <h5 style="margin-top: 20px;">Python</h5>
+        <pre style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; overflow-x: auto;"><code>import requests
+import json
+
+url = 'https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message'
+payload = {
+    'number': '60122273341',
+    'message': 'Hello from Python!'
+}
+
+response = requests.post(url, json=payload)
+result = response.json()
+print(result)</code></pre>
+
+        <h5 style="margin-top: 20px;">PHP</h5>
+        <pre style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; overflow-x: auto;"><code>&lt;?php
+$url = 'https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message';
+$data = [
+    'number' => '60122273341',
+    'message' => 'Hello from PHP!'
+];
+
+$options = [
+    'http' => [
+        'header' => 'Content-Type: application/json',
+        'method' => 'POST',
+        'content' => json_encode($data)
+    ]
+];
+
+$context = stream_context_create($options);
+$result = file_get_contents($url, false, $context);
+echo $result;
+?&gt;</code></pre>
+
+        <h5 style="margin-top: 20px;">JavaScript (Browser)</h5>
+        <pre style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; overflow-x: auto;"><code>fetch('https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    number: '60122273341',
+    message: 'Hello from browser!'
+  })
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));</code></pre>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Testing the API</h4>
+        <div style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 8px; padding: 15px;">
+          <p><strong>1. Check Status:</strong> Visit <code>https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/health</code></p>
+          <p><strong>2. Test with cURL:</strong></p>
+          <pre style="background: white; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.9em;"><code>curl -X POST "https://cloud-run-whatsapp-389627805111.europe-west1.run.app/api/external/send-message" \
+  -H "Content-Type: application/json" \
+  -d '{"number": "YOUR_PHONE_NUMBER", "message": "Test message"}'</code></pre>
+          <p><strong>3. Verify:</strong> Check your WhatsApp to confirm message delivery</p>
+        </div>
+      </div>
+
+      <div class="api-section" style="margin-bottom: 30px;">
+        <h4 style="color: #333; margin-bottom: 15px;">Error Codes</h4>
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <thead style="background: #dc3545; color: white;">
+            <tr>
+              <th style="padding: 12px; text-align: left;">Status Code</th>
+              <th style="padding: 12px; text-align: left;">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 12px;">400</td>
+              <td style="padding: 12px;">Bad Request - Missing required parameters or invalid format</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 12px;">400</td>
+              <td style="padding: 12px;">WhatsApp client not ready</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px;">500</td>
+              <td style="padding: 12px;">Internal server error - Message sending failed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-section">
+        <h4 style="color: #333; margin-bottom: 15px;">Rate Limiting & Best Practices</h4>
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px;">
+          <ul style="margin: 0; padding-left: 20px;">
+            <li><strong>Rate Limiting:</strong> Implement reasonable delays between requests (1-2 seconds minimum)</li>
+            <li><strong>Error Handling:</strong> Always check response status and handle errors gracefully</li>
+            <li><strong>Phone Numbers:</strong> Ensure phone numbers include country codes for reliable delivery</li>
+            <li><strong>Message Length:</strong> WhatsApp has character limits per message</li>
+            <li><strong>Monitoring:</strong> Use the health endpoint to check service availability</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let currentStatus = 'disconnected';
+
+    // DOM elements
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const statusDetails = document.getElementById('statusDetails');
+    const qrContainer = document.getElementById('qrContainer');
+    const qrCode = document.getElementById('qrCode');
+    const messageForm = document.getElementById('messageForm');
+    const contactsSection = document.getElementById('contactsSection');
+    const groupsSection = document.getElementById('groupsSection');
+    const sendMessageForm = document.getElementById('sendMessageForm');
+    const sendButton = document.getElementById('sendButton');
+    const sendButtonText = document.getElementById('sendButtonText');
+    const imageInput = document.getElementById('imageInput');
+    const imagePreview = document.getElementById('imagePreview');
+    const phoneNumberInput = document.getElementById('phoneNumber');
+    const messageTextInput = document.getElementById('messageText');
+    const loadContactsBtn = document.getElementById('loadContactsBtn');
+    const contactsList = document.getElementById('contactsList');
+    const loadGroupsBtn = document.getElementById('loadGroupsBtn');
+    const groupsList = document.getElementById('groupsList');
+    const alertContainer = document.getElementById('alertContainer');
+
+    // Socket event listeners
+    socket.on('status', (data) => {
+      updateStatus(data.status, data.error || data.reason);
+    });
+
+    socket.on('qr', (data) => {
+      showQRCode(data.qr);
+    });
+
+    // Update status display
+    function updateStatus(status, details = '') {
+      currentStatus = status;
+
+      // Update status indicator
+      statusIndicator.className = `status-indicator status-${status}`;
+
+      // Update status text
+      const statusMessages = {
+        'disconnected': 'Disconnected',
+        'qr_ready': 'QR Code Ready',
+        'authenticated': 'Authenticated',
+        'ready': 'Connected & Ready',
+        'auth_failed': 'Authentication Failed'
+      };
+
+      statusText.textContent = statusMessages[status] || status;
+
+      // Update status details
+      if (details) {
+        statusDetails.innerHTML = `<p style="color: #666; margin-top: 10px;">${details}</p>`;
+      } else {
+        statusDetails.innerHTML = '';
+      }
+
+      // Show/hide sections based on status
+      qrContainer.classList.toggle('hidden', status !== 'qr_ready');
+      messageForm.classList.toggle('hidden', status !== 'ready');
+      contactsSection.classList.toggle('hidden', status !== 'ready');
+      groupsSection.classList.toggle('hidden', status !== 'ready');
+    }
+
+    // Show QR code
+    function showQRCode(qrData) {
+      qrCode.src = qrData;
+      qrContainer.classList.remove('hidden');
+    }
+
+    // Show alert
+    function showAlert(message, type = 'success') {
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      alertContainer.appendChild(alert);
+
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
+
+    // Image preview handler
+    imageInput.addEventListener('change', () => {
+      imagePreview.innerHTML = '';
+      const files = imageInput.files;
+      if (files) {
+        Array.from(files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const div = document.createElement('div');
+            div.style.position = 'relative';
+            div.style.width = '80px';
+            div.style.height = '80px';
+            div.innerHTML = `
+              <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+            `;
+            imagePreview.appendChild(div);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    });
+
+    // Send message form handler
+    sendMessageForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const number = phoneNumberInput.value.trim();
+      const message = messageTextInput.value.trim();
+      const files = imageInput.files;
+
+      if (!number || (!message && files.length === 0)) {
+        showAlert('Please provide a number and either a message or an image', 'error');
+        return;
+      }
+
+      // Disable button and show loading
+      sendButton.disabled = true;
+      sendButtonText.innerHTML = '<span class="loading"></span> Sending...';
+
+      const formData = new FormData();
+      formData.append('number', number);
+      formData.append('message', message);
+      
+      if (files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          formData.append('images', files[i]);
+        }
+      }
+
+      try {
+        const response = await fetch('/api/send-message', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showAlert(result.message || 'Message sent successfully!', 'success');
+          messageTextInput.value = '';
+          imageInput.value = '';
+          imagePreview.innerHTML = '';
+        } else {
+          showAlert(result.error || 'Failed to send message', 'error');
+        }
+      } catch (error) {
+        showAlert('Error sending message', 'error');
+      } finally {
+        // Re-enable button
+        sendButton.disabled = false;
+        sendButtonText.textContent = 'Send Message';
+      }
+    });
+
+    // Load contacts handler
+    loadContactsBtn.addEventListener('click', async () => {
+      loadContactsBtn.disabled = true;
+      loadContactsBtn.innerHTML = '<span class="loading"></span> Loading...';
+
+      try {
+        const response = await fetch('/api/contacts');
+        const result = await response.json();
+
+        if (result.contacts) {
+          displayContacts(result.contacts);
+        } else {
+          showAlert(result.error || 'Failed to load contacts', 'error');
+        }
+      } catch (error) {
+        showAlert('Error loading contacts', 'error');
+      } finally {
+        loadContactsBtn.disabled = false;
+        loadContactsBtn.textContent = 'Load Contacts';
+      }
+    });
+
+    // Load groups handler
+    loadGroupsBtn.addEventListener('click', async () => {
+      loadGroupsBtn.disabled = true;
+      loadGroupsBtn.innerHTML = '<span class="loading"></span> Loading...';
+
+      try {
+        const response = await fetch('/api/groups');
+        const result = await response.json();
+
+        if (result.success && result.groups) {
+          displayGroups(result.groups);
+        } else {
+          showAlert(result.error || 'Failed to load communities', 'error');
+        }
+      } catch (error) {
+        showAlert('Error loading communities', 'error');
+      } finally {
+        loadGroupsBtn.disabled = false;
+        loadGroupsBtn.textContent = 'Load Communities';
+      }
+    });
+
+    // Display groups
+    function displayGroups(groups) {
+      groupsList.innerHTML = '';
+
+      if (groups.length === 0) {
+        groupsList.innerHTML = '<p style="text-align: center; color: #666;">No communities/groups found</p>';
+        return;
+      }
+
+      groups.forEach(group => {
+        const groupItem = document.createElement('div');
+        groupItem.className = 'contact-item';
+        const type = group.isCommunity ? 'Community' : (group.isCommunityAnnouncement ? 'Announcement' : 'Group');
+        groupItem.innerHTML = `
+                    <strong>${group.subject}</strong> <span style="font-size: 0.8em; color: #128C7E;">[${type}]</span><br>
+                    <small>${group.id}</small>
+                `;
+
+        groupItem.addEventListener('click', () => {
+          phoneNumberInput.value = group.id;
+          phoneNumberInput.focus();
+          showAlert(`Selected: ${group.subject}`);
+        });
+
+        groupsList.appendChild(groupItem);
+      });
+    }
+
+    // Display contacts
+    function displayContacts(contacts) {
+      contactsList.innerHTML = '';
+
+      if (contacts.length === 0) {
+        contactsList.innerHTML = '<p style="text-align: center; color: #666;">No contacts found</p>';
+        return;
+      }
+
+      contacts.forEach(contact => {
+        const contactItem = document.createElement('div');
+        contactItem.className = 'contact-item';
+        contactItem.innerHTML = `
+                    <strong>${contact.name}</strong><br>
+                    <small>${contact.number}</small>
+                `;
+
+        contactItem.addEventListener('click', () => {
+          phoneNumberInput.value = contact.number;
+          phoneNumberInput.focus();
+          showAlert(`Selected: ${contact.name}`);
+        });
+
+        contactsList.appendChild(contactItem);
+      });
+    }
+
+    // Auto-focus on phone number input when form becomes visible
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          if (!messageForm.classList.contains('hidden')) {
+            phoneNumberInput.focus();
+          }
+        }
+      });
+    });
+
+    observer.observe(messageForm, { attributes: true });
+
+    // Set the API endpoint URL
+    function updateApiEndpoint() {
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      const endpointUrl = `${protocol}//${host}/api/external/send-message`;
+      document.getElementById('endpointUrl').textContent = endpointUrl;
+    }
+
+    // Update endpoint on page load
+    updateApiEndpoint();
+  </script>
+</body>
+
+</html>
