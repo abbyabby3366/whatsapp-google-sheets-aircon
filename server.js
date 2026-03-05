@@ -150,6 +150,22 @@ app.get("/ping", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.get("/blacklist", (req, res) => {
+  try {
+    const blacklistPath = path.join(__dirname, "blacklist.json");
+    if (!fs.existsSync(blacklistPath)) {
+      return res.status(404).json({ error: "blacklist.json not found" });
+    }
+    const data = fs.readFileSync(blacklistPath, "utf8");
+    res.json(JSON.parse(data));
+  } catch (error) {
+    logger.error("Error reading blacklist.json:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to read blacklist", details: error.message });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "healthy",
